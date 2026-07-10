@@ -1,0 +1,37 @@
+{
+  "name": "claude-usage-widget",
+  "version": "1.0.0",
+  "description": "悬浮显示 Claude.ai 用量进度条与5小时会话重置倒计时的桌面小工具 (macOS / Electron)",
+  "main": "main.js",
+  "author": "",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --mac"
+  },
+  "devDependencies": {
+    "electron": "^31.7.7",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.local.claudeusagewidget",
+    "productName": "Claude Usage Widget",
+    "files": [
+      "main.js",
+      "preload.js",
+      "widget.html",
+      "widget.js",
+      "widget.css",
+      "assets/**/*"
+    ],
+    "mac": {
+      "category": "public.app-category.utilities",
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "icon": "assets/icon.icns"
+    }
+  }
+}

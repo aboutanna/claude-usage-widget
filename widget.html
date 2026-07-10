@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline';" />
+<title>Claude Usage Widget</title>
+<link rel="stylesheet" href="widget.css" />
+</head>
+<body>
+  <div id="drag-bar" class="drag-bar">
+    <span class="title">Claude 用量</span>
+    <div class="controls">
+      <button id="pinBtn" class="icon-btn" title="固定展开（不再自动收起）">📌</button>
+      <button id="refreshBtn" class="icon-btn" title="立即刷新">⟳</button>
+      <button id="closeBtn" class="icon-btn" title="隐藏悬浮窗">×</button>
+    </div>
+  </div>
+  <div id="content" class="content">
+    <div id="status" class="status"></div>
+    <div id="bars" class="bars"></div>
+    <div id="countdown" class="countdown"></div>
+    <div id="countdownWeekly" class="countdown"></div>
+    <div id="updated" class="updated"></div>
+  </div>
+  <div class="handle"></div>
+  <script src="widget.js"></script>
+</body>
+</html>
