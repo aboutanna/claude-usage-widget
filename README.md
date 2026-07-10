@@ -6,7 +6,7 @@ macOS 悬浮小窗，实时显示 claude.ai 的用量进度条（5 小时会话 
 
 这是个人使用的非官方工具，原理和 Claude Usage Tracker、ClaudeKarma 等社区 Chrome 扩展完全一致：用你自己登录 claude.ai 后的 session cookie，调用 claude.ai 页面本身也会调用的用量接口 `GET /api/organizations/{orgId}/usage`，不涉及破解或绕过登录。
 
-## 环境要求
+## 环境要求 
 
 - macOS
 - Node.js 18+（`node -v` 确认）
