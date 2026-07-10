@@ -31,11 +31,15 @@ function formatCountdown(resetsAtIso, label) {
   const diff = new Date(resetsAtIso).getTime() - Date.now();
   if (diff <= 0) return `${label}即将重置`;
   const totalSec = Math.floor(diff / 1000);
-  const h = Math.floor(totalSec / 3600);
+  const totalHours = Math.floor(totalSec / 3600);
+  const days = Math.floor(totalHours / 24);
+  const h = totalHours % 24;
   const m = Math.floor((totalSec % 3600) / 60);
   const s = totalSec % 60;
   const pad = (n) => String(n).padStart(2, '0');
-  return `${label}重置倒计时 ${pad(h)}:${pad(m)}:${pad(s)}`;
+  const timeStr = `${pad(h)}:${pad(m)}:${pad(s)}`;
+  const fullTimeStr = days > 0 ? `${days}天 ${timeStr}` : timeStr;
+  return `${label}重置倒计时 ${fullTimeStr}`;
 }
 
 function updateHandleColor() {
@@ -93,7 +97,7 @@ function render() {
 
   const weekly = latestUsage.seven_day;
   countdownWeeklyEl.textContent =
-    weekly && weekly.resets_at ? formatCountdown(weekly.resets_at, '全部模型周') : '';
+    weekly && weekly.resets_at ? formatCountdown(weekly.resets_at, '周') : '';
 
   updateHandleColor();
 }
