@@ -18,6 +18,30 @@ const ORDER = [
 
 let latestUsage = null;
 let countdownTimer = null;
+let overflowActive = false;
+
+// 只要 HH:MM:SS 等宽数字，不带文字标签，用在窗口顶部的溢出区域
+function formatOverflowDigits(resetsAtIso) {
+  if (!resetsAtIso) return '';
+  const diff = new Date(resetsAtIso).getTime() - Date.now();
+  const pad = (n) => String(n).padStart(2, '0');
+  if (diff <= 0) return '00:00:00';
+  const totalSec = Math.floor(diff / 1000);
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  return `${pad(h)}:${pad(m)}:${pad(s)}`;
+}
+
+function renderOverflowBar() {
+  const el = document.getElementById('overflowBar');
+  if (!el) return;
+  if (!overflowActive || !latestUsage || !latestUsage.five_hour || !latestUsage.five_hour.resets_at) {
+    el.textContent = '';
+    return;
+  }
+  el.textContent = formatOverflowDigits(latestUsage.five_hour.resets_at);
+}
 
 function colorFor(pct) {
   if (pct < 50) return '#4CAF50';
@@ -100,6 +124,7 @@ function render() {
     weekly && weekly.resets_at ? formatCountdown(weekly.resets_at, '周') : '';
 
   updateHandleColor();
+  renderOverflowBar();
 }
 
 function startCountdownTicker() {
@@ -157,6 +182,16 @@ window.electronAPI.onPinState((pinned) => {
 
 window.electronAPI.onCollapseState(({ collapsed }) => {
   document.body.classList.toggle('collapsed', collapsed);
+});
+
+window.electronAPI.onThemeState((light) => {
+  document.body.classList.toggle('light', !!light);
+});
+
+window.electronAPI.onOverflowState((state) => {
+  overflowActive = !!(state && state.active);
+  document.body.classList.toggle('overflow-active', overflowActive);
+  renderOverflowBar();
 });
 
 document.getElementById('refreshBtn').addEventListener('click', () => {

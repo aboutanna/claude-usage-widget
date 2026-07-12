@@ -13,6 +13,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onCollapseState: (callback) => {
     ipcRenderer.on('collapse-state', (_event, state) => callback(state));
   },
+  onThemeState: (callback) => {
+    ipcRenderer.on('theme-state', (_event, light) => callback(light));
+  },
+  onOverflowState: (callback) => {
+    ipcRenderer.on('overflow-state', (_event, state) => callback(state));
+  },
   refresh: () => ipcRenderer.send('widget-refresh'),
   hide: () => ipcRenderer.send('widget-hide'),
   openLogin: () => ipcRenderer.send('widget-open-login'),

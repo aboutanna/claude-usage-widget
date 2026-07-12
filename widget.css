@@ -32,7 +32,8 @@ body.collapsed {
 }
 
 body.collapsed .drag-bar,
-body.collapsed .content {
+body.collapsed .content,
+body.collapsed .overflow-bar {
   display: none;
 }
 
@@ -152,4 +153,82 @@ body.collapsed .handle {
   margin-top: 4px;
   font-size: 10px;
   color: #666;
+}
+
+/* 5小时额度到 100% 时，窗口顶部（面板外）出现的等宽倒计时。
+   颜色故意和当前模式的面板底色一致，用文字阴影/描边保证可读性。 */
+.overflow-bar {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  height: 30px;
+  flex-shrink: 0;
+  -webkit-app-region: drag;
+  font-family: ui-monospace, "SF Mono", "Menlo", monospace;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  font-variant-numeric: tabular-nums;
+  color: rgba(28, 28, 30, 0.95);
+  text-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.45),
+    0 0 1px rgba(255, 255, 255, 0.5);
+}
+
+body.overflow-active .overflow-bar {
+  display: flex;
+}
+
+/* ---------- 浅色模式 ---------- */
+body.light {
+  background: rgba(248, 248, 248, 0.95);
+  color: #1c1c1e;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+body.light .drag-bar {
+  color: #555;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+body.light .icon-btn {
+  color: #888;
+}
+
+body.light .icon-btn:hover {
+  background: rgba(0, 0, 0, 0.06);
+  color: #1c1c1e;
+}
+
+body.light .icon-btn.active {
+  background: rgba(10, 110, 191, 0.12);
+  color: #0a6ebf;
+}
+
+body.light .status,
+body.light .bar-label {
+  color: #555;
+}
+
+body.light .status a {
+  color: #0a6ebf;
+}
+
+body.light .bar-track {
+  background: rgba(0, 0, 0, 0.08);
+}
+
+body.light .countdown {
+  color: #0a6ebf;
+}
+
+body.light .updated {
+  color: #999;
+}
+
+body.light .overflow-bar {
+  color: rgba(248, 248, 248, 0.97);
+  text-shadow:
+    0 1px 3px rgba(255, 255, 255, 0.5),
+    0 0 1px rgba(0, 0, 0, 0.3);
 }
