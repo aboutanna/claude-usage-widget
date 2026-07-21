@@ -11,7 +11,7 @@ const BASE_EXPANDED_SIZE = { width: 260, height: 188 };
 const COLLAPSED_SIZE = { width: 14, height: 64 };
 const EDGE_SNAP_THRESHOLD = 60; // 距离屏幕左/右边缘多少像素以内，视为"贴边"
 const COLLAPSE_DELAY_MS = 550; // 鼠标离开后，等待多久再收起
-const OVERFLOW_HEIGHT = 30; // 5小时额度100%时，窗口顶部额外让出的高度（需和 widget.css 的 .overflow-bar 高度一致）
+const OVERFLOW_HEIGHT = 56; // 5小时额度100%时，窗口顶部额外让出的高度（需和 widget.css 的 .overflow-bar 高度一致）
 
 let sessionWindow = null; // 隐藏窗口：承载 claude.ai 登录态 cookie，并在其页面上下文里发起 fetch
 let widgetWindow = null; // 悬浮小窗
@@ -26,7 +26,10 @@ let currentEdge = null; // 'left' | 'right' | null
 let collapseTimer = null;
 let lastExpandedBounds = null; // { x, y, width, height }
 let isLightMode = false; // 浅色模式
-let overflowActive = false; // 5小时额度是否已到 100%
+let isOverflowEnabled = true; // 是否允许满额时弹出大字号倒计时（5 小时和 7 天共用一个开关）
+let overflowActive = false; // 是否有额度已到 100%，正在显示大字号倒计时
+let overflowKind = null; // 'five_hour' | 'weekly' | null —— 同时满额时优先显示 weekly，所以永远只有一行
+let lastUsageData = null; // 最近一次拉取到的用量数据，供切换开关时立即重新计算
 
 function getExpandedSize() {
   return {
@@ -204,14 +207,18 @@ function expandWidget() {
   sendCollapseState();
 }
 
-// 5小时额度是否达到 100% 发生变化时调用：让窗口向上"长高"/"缩回"，
+// 满额倒计时的显示状态发生变化时调用：让窗口向上"长高"/"缩回"，
 // 底边（面板本体）位置不动，只在顶部露出/收回一条透明区域给倒计时数字用。
-function setOverflowActive(active) {
-  if (overflowActive === active) return;
+// 5h 和 7d 永远只显示一行：两个都满额时优先显示 7d，所以窗口高度只跟
+// "是否有任意一行在显示"这个布尔值挂钩，kind 只影响面板里渲染的内容。
+function setOverflowState(active, kind) {
+  if (overflowActive === active && overflowKind === kind) return;
+  const heightChanged = overflowActive !== active;
   overflowActive = active;
-  widgetWindow?.webContents.send('overflow-state', { active: overflowActive });
+  overflowKind = kind;
+  widgetWindow?.webContents.send('overflow-state', { active: overflowActive, kind: overflowKind });
 
-  if (!widgetWindow || widgetWindow.isDestroyed() || isCollapsed) return;
+  if (!heightChanged || !widgetWindow || widgetWindow.isDestroyed() || isCollapsed) return;
 
   const bounds = widgetWindow.getBounds();
   const sign = overflowActive ? 1 : -1;
@@ -223,11 +230,35 @@ function setOverflowActive(active) {
   lastExpandedBounds = { x: bounds.x, y: newY, width: bounds.width, height: newHeight };
 }
 
+// 根据最近一次拉到的用量数据 + 开关状态，重新决定要不要显示、显示哪一行。
+// 开关是 5 小时和 7 天共用的一个总开关；两者都满额时只显示 7d。
+function computeAndApplyOverflow() {
+  if (!lastUsageData) return;
+  if (!isOverflowEnabled) {
+    setOverflowState(false, null);
+    return;
+  }
+
+  const fiveHour = lastUsageData.five_hour;
+  const weekly = lastUsageData.seven_day;
+  const fiveHourFull = !!(fiveHour && typeof fiveHour.utilization === 'number' && fiveHour.utilization >= 100);
+  const weeklyFull = !!(weekly && typeof weekly.utilization === 'number' && weekly.utilization >= 100);
+
+  if (weeklyFull) {
+    setOverflowState(true, 'weekly');
+  } else if (fiveHourFull) {
+    setOverflowState(true, 'five_hour');
+  } else {
+    setOverflowState(false, null);
+  }
+}
+
 // ---------- 悬浮小窗 ----------
 function createWidgetWindow() {
   const cfg = loadConfig();
   isPinned = !!cfg.pinned;
   isLightMode = !!cfg.lightMode;
+  isOverflowEnabled = cfg.overflowEnabled !== false;
 
   const size = getExpandedSize();
   const { width } = screen.getPrimaryDisplay().workAreaSize;
@@ -263,7 +294,7 @@ function createWidgetWindow() {
   widgetWindow.webContents.on('did-finish-load', () => {
     widgetWindow.webContents.send('pin-state', isPinned);
     widgetWindow.webContents.send('theme-state', isLightMode);
-    widgetWindow.webContents.send('overflow-state', { active: overflowActive });
+    widgetWindow.webContents.send('overflow-state', { active: overflowActive, kind: overflowKind });
     sendCollapseState();
   });
 
@@ -298,9 +329,8 @@ async function pollAndBroadcast() {
         sessionWindow.hide();
       }
 
-      const fiveHour = result.data.five_hour;
-      const isFiveHourFull = !!(fiveHour && typeof fiveHour.utilization === 'number' && fiveHour.utilization >= 100);
-      setOverflowActive(isFiveHourFull);
+      lastUsageData = result.data;
+      computeAndApplyOverflow();
 
       widgetWindow?.webContents.send('usage-update', { usage: result.data, ts: Date.now() });
       return;
@@ -358,6 +388,17 @@ function createTray() {
         isLightMode = menuItem.checked;
         saveConfig({ lightMode: isLightMode });
         widgetWindow?.webContents.send('theme-state', isLightMode);
+      },
+    },
+    { type: 'separator' },
+    {
+      label: '满额倒计时提醒',
+      type: 'checkbox',
+      checked: isOverflowEnabled,
+      click: (menuItem) => {
+        isOverflowEnabled = menuItem.checked;
+        saveConfig({ overflowEnabled: isOverflowEnabled });
+        computeAndApplyOverflow();
       },
     },
     { type: 'separator' },

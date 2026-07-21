@@ -19,28 +19,52 @@ const ORDER = [
 let latestUsage = null;
 let countdownTimer = null;
 let overflowActive = false;
+let overflowKind = null; // 'five_hour' | 'weekly' | null
 
-// 只要 HH:MM:SS 等宽数字，不带文字标签，用在窗口顶部的溢出区域
-function formatOverflowDigits(resetsAtIso) {
-  if (!resetsAtIso) return '';
+// 把"距离重置还有多久"拆成天/时/分/秒，formatCountdown 和 renderOverflowBar 共用，
+// 避免两处各写一套换算逻辑。
+function getCountdownParts(resetsAtIso) {
   const diff = new Date(resetsAtIso).getTime() - Date.now();
-  const pad = (n) => String(n).padStart(2, '0');
-  if (diff <= 0) return '00:00:00';
+  if (diff <= 0) return null;
   const totalSec = Math.floor(diff / 1000);
-  const h = Math.floor(totalSec / 3600);
-  const m = Math.floor((totalSec % 3600) / 60);
-  const s = totalSec % 60;
-  return `${pad(h)}:${pad(m)}:${pad(s)}`;
+  const totalHours = Math.floor(totalSec / 3600);
+  return {
+    days: Math.floor(totalHours / 24),
+    h: totalHours % 24,
+    m: Math.floor((totalSec % 3600) / 60),
+    s: totalSec % 60,
+  };
 }
 
 function renderOverflowBar() {
   const el = document.getElementById('overflowBar');
   if (!el) return;
-  if (!overflowActive || !latestUsage || !latestUsage.five_hour || !latestUsage.five_hour.resets_at) {
-    el.textContent = '';
+  if (!overflowActive || !latestUsage) {
+    el.innerHTML = '';
     return;
   }
-  el.textContent = formatOverflowDigits(latestUsage.five_hour.resets_at);
+  const entry = overflowKind === 'weekly' ? latestUsage.seven_day : latestUsage.five_hour;
+  if (!entry || !entry.resets_at) {
+    el.innerHTML = '';
+    return;
+  }
+  const parts = getCountdownParts(entry.resets_at);
+  const pad = (n) => String(n).padStart(2, '0');
+  const timeStr = parts ? `${pad(parts.h)}:${pad(parts.m)}:${pad(parts.s)}` : '00:00:00';
+  const remainingSec = Math.max(0, Math.floor((new Date(entry.resets_at).getTime() - Date.now()) / 1000));
+  // 快到重置时间了：30 分钟内偏蓝、5 分钟内偏绿，都是低饱和度的提示色，不追求警报感。
+  const urgencyClass = remainingSec <= 300 ? 'critical' : remainingSec <= 1800 ? 'warning' : '';
+  // "week" 标签和"N天"合成一块（meta），用绝对定位挂在 HH:MM:SS 左边（见 CSS），
+  // 整体不占布局宽度，所以不管有没有标签、有没有天数，HH:MM:SS 的字号和位置都不变。
+  const label = overflowKind === 'weekly' ? '<span class="overflow-label">week</span>' : '';
+  const days = parts && parts.days > 0 ? `<span class="overflow-days">${parts.days}天</span>` : '';
+  const meta = label || days ? `<div class="overflow-meta">${label}${days}</div>` : '';
+  el.innerHTML = `
+    <div class="overflow-time-row">
+      ${meta}
+      <span class="overflow-digits ${urgencyClass}">${timeStr}</span>
+    </div>
+  `;
 }
 
 function colorFor(pct) {
@@ -52,17 +76,11 @@ function colorFor(pct) {
 
 function formatCountdown(resetsAtIso, label) {
   if (!resetsAtIso) return '';
-  const diff = new Date(resetsAtIso).getTime() - Date.now();
-  if (diff <= 0) return `${label}即将重置`;
-  const totalSec = Math.floor(diff / 1000);
-  const totalHours = Math.floor(totalSec / 3600);
-  const days = Math.floor(totalHours / 24);
-  const h = totalHours % 24;
-  const m = Math.floor((totalSec % 3600) / 60);
-  const s = totalSec % 60;
+  const parts = getCountdownParts(resetsAtIso);
+  if (!parts) return `${label}即将重置`;
   const pad = (n) => String(n).padStart(2, '0');
-  const timeStr = `${pad(h)}:${pad(m)}:${pad(s)}`;
-  const fullTimeStr = days > 0 ? `${days}天 ${timeStr}` : timeStr;
+  const timeStr = `${pad(parts.h)}:${pad(parts.m)}:${pad(parts.s)}`;
+  const fullTimeStr = parts.days > 0 ? `${parts.days}天 ${timeStr}` : timeStr;
   return `${label}重置倒计时 ${fullTimeStr}`;
 }
 
@@ -190,6 +208,7 @@ window.electronAPI.onThemeState((light) => {
 
 window.electronAPI.onOverflowState((state) => {
   overflowActive = !!(state && state.active);
+  overflowKind = (state && state.kind) || null;
   document.body.classList.toggle('overflow-active', overflowActive);
   renderOverflowBar();
 });

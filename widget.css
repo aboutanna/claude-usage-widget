@@ -12,20 +12,30 @@ html, body {
 }
 
 body {
-  background: rgba(28, 28, 30, 0.92);
-  color: #f0f0f0;
-  border-radius: 12px;
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.08);
   -webkit-user-select: none;
   user-select: none;
   display: flex;
   flex-direction: column;
 }
 
+/* 卡片本体：只有这一层有背景/边框/圆角，
+   顶部的溢出倒计时条留在这层外面，保持完全透明 */
+.panel {
+  flex: 1;
+  min-height: 0;
+  background: rgba(28, 28, 30, 0.92);
+  color: #f0f0f0;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  flex-direction: column;
+}
+
 /* 收起状态：整个窗口本身也会被主进程缩成一个细长条，
    这里只是让内部布局切换成"只显示手柄"的样子 */
-body.collapsed {
+body.collapsed .panel {
   border-radius: 8px;
   align-items: center;
   justify-content: center;
@@ -155,32 +165,94 @@ body.collapsed .handle {
   color: #666;
 }
 
-/* 5小时额度到 100% 时，窗口顶部（面板外）出现的等宽倒计时。
-   颜色故意和当前模式的面板底色一致，用文字阴影/描边保证可读性。 */
+/* 5小时/7天额度到 100% 时，窗口顶部（面板外）出现的倒计时。
+   纯文字，不加胶囊/毛玻璃容器。"week" 标签和"N天"合在一起，用绝对定位
+   挂在 HH:MM:SS 左边，整体脱离文档流，所以它们在不在都不会影响
+   HH:MM:SS 的位置和字号。 */
 .overflow-bar {
   display: none;
   align-items: center;
   justify-content: center;
-  height: 30px;
+  height: 56px;
   flex-shrink: 0;
   -webkit-app-region: drag;
-  font-family: ui-monospace, "SF Mono", "Menlo", monospace;
-  font-size: 16px;
-  font-weight: 600;
-  letter-spacing: 1px;
-  font-variant-numeric: tabular-nums;
-  color: rgba(28, 28, 30, 0.95);
-  text-shadow:
-    0 1px 3px rgba(0, 0, 0, 0.45),
-    0 0 1px rgba(255, 255, 255, 0.5);
 }
 
 body.overflow-active .overflow-bar {
   display: flex;
 }
 
+/* HH:MM:SS 所在行：relative 定位，好让 meta（标签+天数）用 absolute 挂在旁边而不占宽度 */
+.overflow-time-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* "week" 标签 + "N天" 合成一块，绝对定位挂在数字左边，不参与布局，
+   数字永远居中、字号不变。两者上下堆叠，右对齐贴着数字。 */
+.overflow-meta {
+  position: absolute;
+  right: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  margin-right: 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+  white-space: nowrap;
+}
+
+/* 7 天满额时显示的 "week" 标签，用来跟 5 小时倒计时（不带标签）区分。
+   两者同时满额时只显示 7 天这一行，所以最多同时出现一个标签。 */
+.overflow-label {
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.5);
+  line-height: 1;
+}
+
+/* 超过 24 小时时显示的"N天"，跟着 "week" 标签一起挂在数字左边 */
+.overflow-days {
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif;
+  font-size: 10px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: rgba(255, 255, 255, 0.55);
+  line-height: 1;
+}
+
+/* 数字用固定字号、不用等宽字体：跟系统字体一致，靠 tabular-nums 保证
+   走秒的时候数字不会因为宽度不同而抖动，观感比等宽字体更接近 Apple 系统的
+   倒计时/时钟字体。不管有没有标签、有没有"N天"前缀，字号和位置都不变。 */
+.overflow-digits {
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
+  font-size: 28px;
+  font-weight: 500;
+  letter-spacing: 0.3px;
+  font-variant-numeric: tabular-nums;
+  color: #f5f5f7;
+  line-height: 1;
+  transition: color 0.3s ease;
+}
+
+/* 快到重置时间：30 分钟内、5 分钟内提醒，颜色直接取用面板里已有的
+   蓝色（.countdown 文字）和绿色（用量条最低档），跟全局配色保持一致。 */
+.overflow-digits.warning {
+  color: #9ad1ff;
+}
+
+.overflow-digits.critical {
+  color: #4CAF50;
+}
+
 /* ---------- 浅色模式 ---------- */
-body.light {
+body.light .panel {
   background: rgba(248, 248, 248, 0.95);
   color: #1c1c1e;
   border: 1px solid rgba(0, 0, 0, 0.08);
@@ -226,9 +298,18 @@ body.light .updated {
   color: #999;
 }
 
-body.light .overflow-bar {
-  color: rgba(248, 248, 248, 0.97);
-  text-shadow:
-    0 1px 3px rgba(255, 255, 255, 0.5),
-    0 0 1px rgba(0, 0, 0, 0.3);
+body.light .overflow-label {
+  color: rgba(0, 0, 0, 0.45);
+}
+
+body.light .overflow-days {
+  color: rgba(0, 0, 0, 0.5);
+}
+
+body.light .overflow-digits {
+  color: #1c1c1e;
+}
+
+body.light .overflow-digits.warning {
+  color: #0a6ebf;
 }
